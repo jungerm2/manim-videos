@@ -1,0 +1,19 @@
+/* Core responsive fixes for Manim videos */
+.manim-video {
+    width: 100% !important;
+    text-align: center;
+}
+
+video {
+    max-width: 100%;
+    height: auto;
+}
+
+div[class^="highlight-"] {
+    margin: 0 !important;
+}
+
+/* Hide the code block that would be used for binder */
+pre[data-manim-binder] {
+    display: none !important;
+}
