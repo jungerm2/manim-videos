@@ -20,7 +20,7 @@ release = __version__
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-root_doc = "source/index"
+root_doc = "index"
 templates_path = ['_templates']
 exclude_patterns = []
 
@@ -42,7 +42,7 @@ html_theme_options = {
     },
     "source_repository": "https://github.com/jungerm2/manim-videos",
     "source_branch": "main",
-    "source_directory": "docs/",
+    "source_directory": "docs/source/",
     "light_logo": "logo_light.svg",
     "dark_logo": "logo_dark.svg",
     "footer_icons": [

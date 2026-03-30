@@ -94,7 +94,10 @@ jobs:
         run: uv sync --group docs
 
       - name: Build HTML docs
-        run: uv run --group docs sphinx-build -b html docs/ docs/build/html
+        run: |
+          # Create a root redirect so visitors land on /latest/ by default
+          echo '<meta http-equiv="refresh" content="0; url=latest/index.html" />' > docs/build/html/index.html
+          uv run --group docs sphinx-build -b html -c docs/ docs/source/ docs/build/html/latest
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
