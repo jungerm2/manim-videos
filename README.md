@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/_static/logo_dark.svg">
-    <img alt="manim-videos logo" src="docs/_static/logo_light.svg" width="600">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/source/_static/logo_dark.svg">
+    <img alt="manim-videos logo" src="docs/source/_static/logo_light.svg" width="600">
   </picture>
 </p>
 
