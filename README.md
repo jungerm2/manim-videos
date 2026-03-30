@@ -7,7 +7,7 @@
 
 # Manim Videos
 
-Embed video clips in **Manim** scenes and **Manim Slides** presentations — efficiently.
+Efficiently embed video clips in **Manim** scenes and **Manim Slides** presentations.
 
 Instead of decoding video frames one-by-one into `ImageMobject`s, `manim_videos`
 renders a transparent placeholder during Manim's normal pass and then uses
@@ -34,3 +34,5 @@ Which can be rendered and previewed using the following command:
 ```bash
 manim -pql my_scene.py MyScene
 ```
+
+See the [documentation](https://jungerm2.github.io/manim-videos/) for more!
