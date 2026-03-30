@@ -7,28 +7,28 @@ Mix :class:`VideoMixin` into any :class:`~manim.Scene` (or
 Usage with plain Manim::
 
     from manim import *
-    from manim_videos import VideoMixin, VideoMObject
+    from manim_videos import VideoMixin, VideoMObject, OverlayVideo
 
     class MyScene(VideoMixin, Scene):
         def construct(self):
             vid = VideoMObject("clip.mp4")
             self.next_section()
             self.add(vid)
-            self.play(vid.play())
+            self.play(OverlayVideo(vid))
             self.next_section()
 
 Usage with Manim Slides (requires ``manim-slides`` to be installed)::
 
     from manim import *
     from manim_slides import Slide
-    from manim_videos import VideoMixin, VideoMObject
+    from manim_videos import VideoMixin, VideoMObject, OverlayVideo
 
     class MySlide(VideoMixin, Slide):
         def construct(self):
             vid = VideoMObject("clip.mp4")
             self.next_slide(loop=True)
             self.add(vid)
-            self.play(vid.play())
+            self.play(OverlayVideo(vid))
 """
 
 from __future__ import annotations

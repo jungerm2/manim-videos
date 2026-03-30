@@ -14,5 +14,5 @@ from manim_videos.animations import OverlayVideo
 from manim_videos.mixins import VideoMixin
 from manim_videos.mobjects import VideoMObject
 
-__all__ = ["OverlayVideo", "VideoMixin", "VideoMObject"]
+__all__ = ["OverlayVideo", "VideoMObject", "VideoMixin"]
 __version__ = "0.1.0"

@@ -159,7 +159,8 @@ class VideoMObject(Rectangle):
         Returns:
             The first frame of the clip.
         """
-        return self.get_frame(0, border=border)
+        clip = self.get_clip()
+        return self.get_frame(clip.start, border=border)
 
     def get_last_frame(self, border: bool = False) -> Group | ImageMobject:
         """Return the last frame of the clip.
@@ -171,4 +172,4 @@ class VideoMObject(Rectangle):
             The last frame of the clip.
         """
         clip = self.get_clip()
-        return self.get_frame(clip.end - 1 / clip.fps, border=border)
+        return self.get_frame(clip.end, border=border)

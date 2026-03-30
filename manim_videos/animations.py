@@ -42,7 +42,11 @@ class OverlayVideo(Wait):
     """
 
     def __init__(
-        self, video_mobject: VideoMObject, run_time: float | None = None, frozen_frame: bool = False, **kwargs
+        self,
+        video_mobject: VideoMObject,
+        run_time: float | None = None,
+        frozen_frame: bool = False,
+        **kwargs,
     ) -> None:
         if run_time is None:
             run_time = video_mobject.duration
@@ -78,7 +82,7 @@ class OverlayVideo(Wait):
                 camera.pixel_width / camera.frame_width,
                 -camera.pixel_height / camera.frame_height,
                 1,
-            ]
+            ],
         )
         offset = np.array([camera.pixel_width / 2, camera.pixel_height / 2, 0])
         return (np.array(point) - camera.frame_center) * conversion + offset
@@ -138,7 +142,7 @@ class OverlayVideo(Wait):
             raise RuntimeError(
                 f"Exactly one partial movie file is needed to overlay video on, "
                 f"instead got {self.section_paths}. "
-                "Try adding `self.next_section()` before and after the play call."
+                "Try adding `self.next_section()` before and after the play call.",
             )
 
         section_video = VideoFileClip(self.section_paths[0])
