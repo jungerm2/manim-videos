@@ -31,3 +31,25 @@ manim -pql examples/basic_scene.py VideoExample
 manim-slides render -ql examples/slide_deck.py VideoSlide
 manim-slides present VideoSlide
 ```
+
+## Comparison between Manim Videos and using ImageMobjects to play a video (`trailer.py`)
+
+To render the big bunny trailer example from the quickstart guide:
+```bash
+manim -pql examples/trailer.py Trailer
+```
+
+Which takes ~47 seconds on my (very old) laptop. Meanwhile, rendering the videos out frame-by-frame using ImageMobjects takes ~3:15 minutes:
+
+```bash
+manim -pql examples/trailer_slow.py TrailerSlow
+```
+
+Not only is it much slower, but it also plays back at the wrong speed:
+```
+WARNING  The original duration of TrailerSlow.wait(), 0.0416667 seconds, is too    scene.py:1118
+          short for the current frame rate of 15 FPS. Rendering with the shortest                
+          possible duration of 0.0666667 seconds instead.  
+```
+
+...and it's much harder to play animations at the same time (here the replacement transform happens before the playback).
