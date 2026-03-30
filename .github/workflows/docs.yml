@@ -96,7 +96,11 @@ jobs:
       - name: Build HTML docs
         run: |
           uv run --group docs sphinx-build -b html -c docs/ docs/source/ docs/build/html/latest
-
+          
+          # Move the generated scenes and slides into the latest directory
+          mv docs/build/html/latest/source/* docs/build/html/latest
+          rm -rf docs/build/html/latest/source
+          
           # Create a root redirect so visitors land on /latest/ by default
           echo '<meta http-equiv="refresh" content="0; url=latest/index.html" />' > docs/build/html/index.html
 
