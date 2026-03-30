@@ -1,6 +1,23 @@
 Quick Start
 ===========
 
+Installation
+------------
+
+First, install ``manim-videos``:
+
+.. code-block:: bash
+
+   pip install manim-videos 
+
+
+.. note::
+
+   If using `manim-slides <https://eertmans.be/manim-slides/>`_, it must be installed
+   separately, it is *not* bundled with ``manim-videos``.
+
+
+
 Videos in a Manim Scene
 -----------------------
 
@@ -118,8 +135,3 @@ Render and present using::
 .. tip::
 
    You can use ``auto_next=True`` in ``next_slide()`` to automatically advance to the next slide after the current animations finish which can help with transitions.
-
-.. note::
-
-   `manim-slides <https://eertmans.be/manim-slides/>`_ must be installed
-   separately, it is *not* bundled with ``manim-videos``.

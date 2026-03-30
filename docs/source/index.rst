@@ -4,7 +4,6 @@ manim-videos
 .. toctree::
    :caption: Getting Started
 
-   installation
    quickstart
    how-it-works
    limitations
