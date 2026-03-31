@@ -150,7 +150,7 @@ class OverlayVideo(Wait):
             self.video_mobject.get_clip()
             .resized((int(self.width), int(self.height)))
             .with_position(tuple(self.upper_left))
-            .with_fps(int(config["frame_rate"]))
+            .with_fps(config.frame_rate)
         )
         composite = CompositeVideoClip([section_video, clip])
 
@@ -158,5 +158,5 @@ class OverlayVideo(Wait):
         # https://github.com/Zulko/moviepy/issues/1029
         original = self.section_paths[0]
         tmp_path = str(Path(original).with_name("temporary_overlay").with_suffix(Path(original).suffix))
-        composite.write_videofile(tmp_path)
+        composite.write_videofile(tmp_path, fps=config.frame_rate)
         os.replace(tmp_path, original)
