@@ -145,7 +145,7 @@ class OverlayVideo(Wait):
                 "Try adding `self.next_section()` before and after the play call.",
             )
 
-        section_video = VideoFileClip(self.section_paths[0])
+        section_video = VideoFileClip(self.section_paths[0]).with_fps(config.frame_rate)
         clip = (
             self.video_mobject.get_clip()
             .resized((int(self.width), int(self.height)))
