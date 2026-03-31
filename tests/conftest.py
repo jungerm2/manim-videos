@@ -3,14 +3,13 @@ from __future__ import annotations
 import functools
 import inspect
 from pathlib import Path
-from typing import Iterator
 
 import cairo
 import imageio.v3 as iio
 import moderngl
 import numpy as np
 import pytest
-from manim import *
+from manim import Scene, tempconfig
 from moviepy import DataVideoClip, VideoFileClip
 from syrupy.extensions.image import PNGImageSnapshotExtension
 from syrupy.extensions.single_file import SingleFileSnapshotExtension
@@ -100,9 +99,7 @@ class VideoSnapshotExtension(SingleFileSnapshotExtension):
         return VideoFileClip(str(path))
 
     @classmethod
-    def write_snapshot_collection(
-        cls, *, snapshot_collection: "SnapshotCollection"
-    ) -> None:
+    def write_snapshot_collection(cls, *, snapshot_collection) -> None:
         filepath, data = (
             snapshot_collection.location,
             next(iter(snapshot_collection)).data,
@@ -199,9 +196,7 @@ def snapshot_frames_comparison(*, last_frame=False, base_scene=VideoScene, quali
 
 
 def pytest_addoption(parser):
-    parser.addoption(
-        "--video-debug", action="store_true", default=False, help="Enable debug mode for video snapshots"
-    )
+    parser.addoption("--video-debug", action="store_true", default=False, help="Enable debug mode for video snapshots")
 
 
 def pytest_configure(config):

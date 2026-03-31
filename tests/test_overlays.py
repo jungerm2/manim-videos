@@ -1,7 +1,7 @@
 import pytest
-
 from manim import LEFT, RIGHT
 from moviepy import VideoFileClip
+
 from manim_videos import OverlayVideo, VideoMObject
 
 __module_test__ = "overlays"
@@ -9,8 +9,7 @@ __module_test__ = "overlays"
 
 def section_duration(section):
     return sum(
-        VideoFileClip(partial_movie_file).duration
-        for partial_movie_file in section.get_clean_partial_movie_files()
+        VideoFileClip(partial_movie_file).duration for partial_movie_file in section.get_clean_partial_movie_files()
     )
 
 
@@ -35,4 +34,4 @@ def test_overlay_with_different_fps(scene):
 
     assert len(scene.renderer.file_writer.sections) == 3
     d1, d2, d3 = [section_duration(section) for section in scene.renderer.file_writer.sections]
-    assert d1 == d2 == d3 
+    assert d1 == d2 == d3
