@@ -39,10 +39,10 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev --python ${{ matrix.python-version }}
 
-      - name: Ruff check
+      - name: Lint
         run: uv run ruff check --extend-select I manim_videos/ tests/ examples/
 
-      - name: Ruff format check
+      - name: Format
         run: uv run ruff format --check manim_videos/ tests/ examples/
 
       - name: Run tests

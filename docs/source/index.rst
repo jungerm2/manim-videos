@@ -12,6 +12,7 @@ manim-videos
    :maxdepth: 2
    :caption: Development
 
+   contributing
    api/index
    changelog
 
