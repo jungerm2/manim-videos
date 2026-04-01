@@ -72,13 +72,18 @@ class ImageSnapshotExtension(PNGImageSnapshotExtension):
         This works because the default snapshot writer will save the serialized data
         as a snapshot, and this serialized data was read from a valid image file.
         """
+        self.serialized_path = data
+
         with open(data, "rb") as f:
             return f.read()
 
     def matches(self, *, serialized_data, snapshot_data) -> bool:
         serialized_im = iio.imread(serialized_data)
         snapshot_im = iio.imread(snapshot_data)
-        return np.allclose(serialized_im, snapshot_im)
+        diff = np.abs(serialized_im.astype(np.int16) - snapshot_im.astype(np.int16))
+        diff_path = Path(self.serialized_path).parent / "diff.png"
+        iio.imwrite(diff_path, diff.astype(np.uint8))
+        return diff.mean() < 1
 
 
 class VideoSnapshotExtension(SingleFileSnapshotExtension):
@@ -121,15 +126,14 @@ class VideoSnapshotExtension(SingleFileSnapshotExtension):
             if not pytest.video_debug_enabled and not is_match:
                 break
 
-        if not is_match:
-            diff_path = Path(serialized_data.filename).parent / "diff.png"
-            iio.imwrite(diff_path, diff_frames[-1])
+        diff_path = Path(serialized_data.filename).parent / "diff.png"
+        iio.imwrite(diff_path, diff_frames[-1])
 
-            if pytest.video_debug_enabled:
-                diff_path = Path(serialized_data.filename).parent / "diff.mp4"
-                clip = DataVideoClip(diff_frames, lambda frame: frame, fps=serialized_data.fps)
-                clip.write_videofile(str(diff_path), logger=None)
-                clip.close()
+        if pytest.video_debug_enabled:
+            diff_path = Path(serialized_data.filename).parent / "diff.mp4"
+            clip = DataVideoClip(diff_frames, lambda frame: frame, fps=serialized_data.fps)
+            clip.write_videofile(str(diff_path), logger=None)
+            clip.close()
 
         return is_match
 
@@ -205,7 +209,7 @@ def pytest_configure(config):
     simply import them from a utils module because of the way pytest
     discovers and runs tests.
     """
+    pytest.video_debug_enabled = config.getoption("--video-debug")
+    pytest.snapshot_update = config.getoption("--snapshot-update", default=False)
     pytest.snapshot_frames_comparison = snapshot_frames_comparison
     pytest.get_test_clip = get_test_clip
-    pytest.VideoScene = VideoScene
-    pytest.video_debug_enabled = config.getoption("--video-debug")

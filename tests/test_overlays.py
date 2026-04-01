@@ -19,6 +19,17 @@ def test_basic_overlay(scene):
     scene.play(OverlayVideo(video.scale(2.5)))
 
 
+@pytest.snapshot_frames_comparison(last_frame=True)
+def test_get_frame_position(scene):
+    video = VideoMObject(pytest.get_test_clip(num_images=5, fps=5)).stretch_to_keep_aspect().scale(2.5)
+
+    if pytest.snapshot_update:
+        scene.add(video.get_last_frame())
+        scene.wait()
+    else:
+        scene.play(OverlayVideo(video))
+
+
 @pytest.snapshot_frames_comparison(last_frame=False)
 def test_overlay_with_different_fps(scene):
     video1 = VideoMObject(pytest.get_test_clip(num_images=10, fps=30))

@@ -172,4 +172,4 @@ class VideoMObject(Rectangle):
             The last frame of the clip.
         """
         clip = self.get_clip()
-        return self.get_frame(clip.end, border=border)
+        return self.get_frame(clip.end - 1/clip.fps, border=border)
