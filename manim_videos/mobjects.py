@@ -124,7 +124,7 @@ class VideoMObject(Rectangle):
             .stretch_to_fit_width(self.width)
             .stretch_to_fit_height(self.height)
             .move_to(self.get_center())
-            .set_stroke(self.stroke_color, self.stroke_opacity)
+            .set_stroke(color=self.stroke_color, opacity=self.stroke_opacity, width=self.stroke_width)
         )
 
     def get_frame(self, t: float, border: bool = False) -> Group | ImageMobject:
