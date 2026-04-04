@@ -20,8 +20,11 @@ from __future__ import annotations
 
 from functools import partial
 from pathlib import Path
+from typing import Self
 
-from manim import GRAY, RED, Group, ImageMobject, ManimColor, Rectangle, Text
+import numpy as np
+import numpy.typing as npt
+from manim import GRAY, RED, RIGHT, Group, ImageMobject, ManimColor, Rectangle, Text, angle_of_vector
 from moviepy import VideoFileClip
 
 
@@ -65,6 +68,7 @@ class VideoMObject(Rectangle):
         **kwargs,
     ) -> None:
         super().__init__(*args, stroke_width=stroke_width, fill_color=fill_color, fill_opacity=fill_opacity, **kwargs)
+        self.is_reversed = False
 
         if isinstance(clip, (str, Path)):
             clip = VideoFileClip(str(clip))
@@ -80,7 +84,7 @@ class VideoMObject(Rectangle):
         #   it will think it was already cached! Other attrs might cause similar issues...
         self.get_clip = partial(lambda: clip)
 
-        self.text = Text(f"Video clip of:\n{clip.filename}", color=RED).move_to(self.get_center())
+        self.text = Text(f"Video clip of:\n{getattr(clip, 'filename', 'Unknown')}", color=RED).move_to(self.get_center())
         self.text.scale_to_fit_width(self.width * 0.95)
         self.add(self.text)
 
@@ -89,7 +93,31 @@ class VideoMObject(Rectangle):
         """The total duration of the embedded video clip (in seconds)."""
         return float(self.get_clip().duration)
 
-    def stretch_to_keep_aspect(self, keep_dim: int = 0) -> VideoMObject:
+    @property
+    def angle(self) -> float:
+        """The current rotation angle of the mobject (in radians)."""
+        # Vector from Top-Right vertex (points[0]) to Top-Left vertex (points[1])
+        v = self.points[0] - self.points[1]
+
+        if self.is_reversed:
+            v = -v
+
+        return angle_of_vector(v) - angle_of_vector(RIGHT)
+
+    def get_ordered_vertices(self) -> npt.NDArray:
+        """Return the vertices of the mobject in counter-clockwise order."""
+        vertices = super().get_vertices()
+
+        if self.is_reversed:
+            vertices = vertices[[0, 3, 2, 1]]
+        return vertices
+
+    def reverse_direction(self) -> Self:
+        """Same as `~manim.Mobject.reverse_direction` but also keeps track of the reversed state."""
+        self.is_reversed = not self.is_reversed
+        return super().reverse_direction()
+
+    def stretch_to_keep_aspect(self, keep_dim: int = 0) -> Self:
         """Resize the placeholder to match the clip's native aspect ratio.
 
         Args:
@@ -118,13 +146,12 @@ class VideoMObject(Rectangle):
         return self
 
     def get_border(self) -> Rectangle:
-        """Return a :class:`~manim.Rectangle` matching the current size and stroke of the video."""
+        """Return a :class:`~manim.Rectangle` matching the current size, rotation, and stroke of the video."""
         return (
             Rectangle()
-            .stretch_to_fit_width(self.width)
-            .stretch_to_fit_height(self.height)
-            .move_to(self.get_center())
+            .match_points(self)
             .set_stroke(color=self.stroke_color, opacity=self.stroke_opacity, width=self.stroke_width)
+            .set_fill(opacity=0)
         )
 
     def get_frame(self, t: float, border: bool = False) -> Group | ImageMobject:
@@ -138,12 +165,20 @@ class VideoMObject(Rectangle):
             The decoded frame as an :class:`~manim.ImageMobject`, optionally
             inside a :class:`~manim.Group` with the border.
         """
-        frame = (
-            ImageMobject(self.get_clip().get_frame(t=t))
-            .stretch_to_fit_width(self.width)
-            .stretch_to_fit_height(self.height)
-            .move_to(self.get_center())
-        )
+        clip = self.get_clip()
+        frame_arr = clip.get_frame(t=t)
+
+        if clip.mask:
+            mask = clip.mask.get_frame(t=t) * 255
+            frame_arr = np.dstack((frame_arr, mask.astype(np.uint8)))
+
+        frame = ImageMobject(frame_arr)
+
+        # Align frame to the current geometry of the placeholder
+        frame.stretch_to_fit_width(self.width)
+        frame.stretch_to_fit_height(self.height)
+        frame.move_to(self.get_center())
+        frame.rotate(self.angle)
 
         if border:
             return Group(self.get_border(), frame)
@@ -172,4 +207,4 @@ class VideoMObject(Rectangle):
             The last frame of the clip.
         """
         clip = self.get_clip()
-        return self.get_frame(clip.end - 1/clip.fps, border=border)
+        return self.get_frame(clip.end - 1 / clip.fps, border=border)
