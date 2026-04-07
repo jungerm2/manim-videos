@@ -10,7 +10,7 @@ import moderngl
 import numpy as np
 import pytest
 from manim import Scene, tempconfig
-from moviepy import DataVideoClip, VideoFileClip
+from moviepy import DataVideoClip, VideoClip, VideoFileClip
 from syrupy.extensions.image import PNGImageSnapshotExtension
 from syrupy.extensions.single_file import SingleFileSnapshotExtension
 
@@ -43,7 +43,9 @@ class VideoScene(VideoMixin, Scene):
         super().construct()
 
 
-def get_test_clip(shape: tuple[int, int] = (128, 128), num_images: int = 150, fps: int = 30) -> DataVideoClip:
+def get_test_clip(
+    shape: tuple[int, int] = (128, 128), num_images: int = 150, fps: int = 30, mask: bool = False
+) -> DataVideoClip:
     """Create and return a synthetic test video clip, with a white circle moving from left to right (taken from mediapy)"""
 
     def generate_image(image_index: int) -> np.ndarray:
@@ -59,6 +61,15 @@ def get_test_clip(shape: tuple[int, int] = (128, 128), num_images: int = 150, fp
 
     clip = DataVideoClip(range(num_images), generate_image, fps)
     clip.filename = f"test_clip_{shape[0]}x{shape[1]}_{num_images}frames_{fps}fps"
+
+    if mask:
+        # 8x8 checkerboard
+        yy, xx = np.indices(shape)
+        checker = ((yy // (shape[0] // 8)) + (xx // (shape[1] // 8))) % 2
+        mask_arr = checker.astype(float)
+        m_clip = VideoClip(is_mask=True, frame_function=lambda t: mask_arr).with_duration(clip.duration).with_fps(fps)
+        clip = clip.with_mask(m_clip)
+
     return clip
 
 

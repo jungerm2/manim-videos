@@ -17,7 +17,7 @@ from pathlib import Path
 
 import numpy as np
 from manim import Scene, Wait, config
-from moviepy import CompositeVideoClip, VideoFileClip
+from moviepy import CompositeVideoClip, VideoFileClip, vfx
 from PIL import Image
 
 from manim_videos.mobjects import VideoMObject
@@ -62,9 +62,9 @@ class OverlayVideo(Wait):
         super().__init__(run_time, frozen_frame=frozen_frame, **kwargs)
 
     def interpolate(self, alpha: float) -> None:
+        super().interpolate(alpha)
         self._ts.append(alpha)
         self._corners.append(self.video_mobject.get_ordered_vertices())
-        super().interpolate(alpha)
 
     @staticmethod
     def coords_to_pix(scene: Scene, point: np.ndarray) -> np.ndarray:
@@ -248,20 +248,39 @@ class OverlayVideo(Wait):
                 / a
             )
 
-        # Apply transforms to target clip, if warping we need to use a mask
-        # If the homography is a pure translation, use it to set the clip's position
-        # We need to invert it first because it's the backward mapping (section -> clip)
-        if len(homographies) == 1:
-            H = np.eye(3).flatten()
-            H[:8] = homographies[0]
+        def get_inverse_homography(params):
+            # Rebuild matrix from params, invert it, normalize it, and return the params
+            a, b, c, d, e, f, g, h = params
+            H = np.array([a, b, c, d, e, f, g, h, 1])
             H = np.linalg.inv(H.reshape(3, 3))
             H = H.flatten() / H[-1, -1]
-            a, b, c, d, e, f, g, h, _ = H
+            return H[:8]
 
-            if np.allclose([b, d, g, h], 0):
-                clip = clip.with_position((c, f)).resized((clip.w * a, clip.h * e))
+        def apply_similarity_transform(clip, params):
+            # If the homography is a pure translation+scale, use it to set the clip's position/resize
+            # We need to invert it first because it's the backward mapping (section -> clip)
+            a, b, c, d, e, f, g, h = get_inverse_homography(params)
+            clip = clip.with_position((c, f)).resized((clip.w * np.abs(a), clip.h * np.abs(e)))
+
+            if a < 0:
+                clip = clip.with_effects([vfx.MirrorX()])
+            if e < 0:
+                clip = clip.with_effects([vfx.MirrorY()])
+
+            return clip
+
+        def is_similarity_transform(params):
+            # Check if the homography is a similarity transform, this works for both the
+            # forward/backward mapping since everything except the translation/scale should be eye(3).
+            a, b, c, d, e, f, g, h = params
+            return np.allclose([b - 1, d - 1, g, h], 0)
+
+        if len(homographies) == 1 and is_similarity_transform(homographies[0]):
+            clip = apply_similarity_transform(clip, homographies[0])
         else:
-            clip = clip.with_mask().transform(warp_frame, apply_to=["mask"])
+            if clip.mask is None:
+                clip = clip.with_mask()
+            clip = clip.transform(warp_frame, apply_to=["mask"])
 
         # Write to a temp file then replace, working around a moviepy bug:
         # https://github.com/Zulko/moviepy/issues/1029

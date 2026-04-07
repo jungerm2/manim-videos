@@ -18,6 +18,8 @@ Example::
 
 from __future__ import annotations
 
+import os
+from ast import literal_eval
 from functools import partial
 from pathlib import Path
 from typing import Self
@@ -64,12 +66,9 @@ class VideoMObject(Rectangle):
         *args,
         stroke_width: float = 0,
         fill_color: ManimColor = GRAY,
-        fill_opacity: float = 1.0,
+        fill_opacity: float | None = None,
         **kwargs,
     ) -> None:
-        super().__init__(*args, stroke_width=stroke_width, fill_color=fill_color, fill_opacity=fill_opacity, **kwargs)
-        self.is_reversed = False
-
         if isinstance(clip, (str, Path)):
             clip = VideoFileClip(str(clip))
 
@@ -84,8 +83,15 @@ class VideoMObject(Rectangle):
         #   it will think it was already cached! Other attrs might cause similar issues...
         self.get_clip = partial(lambda: clip)
 
-        self.text = Text(f"Video clip of:\n{getattr(clip, 'filename', 'Unknown')}", color=RED).move_to(self.get_center())
+        self.skip_overlay = literal_eval(os.environ.get("SKIP_VIDEO_OVERLAY", "False"))
+        fill_opacity = fill_opacity if not clip.mask or self.skip_overlay else 0.0
+        super().__init__(*args, stroke_width=stroke_width, fill_color=fill_color, fill_opacity=fill_opacity, **kwargs)
+
+        self.text = Text(
+            f"Video clip of:\n{getattr(clip, 'filename', 'Unknown')}", color=RED, fill_opacity=fill_opacity
+        ).move_to(self.get_center())
         self.text.scale_to_fit_width(self.width * 0.95)
+        self.is_reversed = False
         self.add(self.text)
 
     @property

@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from manim import BLUE, DEGREES, DOWN, LEFT, ORIGIN, PI, RIGHT, UP, FadeIn, Rotate, Text
+from manim import BLUE, DEGREES, DOWN, LEFT, ORIGIN, PI, RIGHT, UP, FadeIn, Rotate, Text, ValueTracker, always_redraw
 from manim.utils import rate_functions
 from moviepy import VideoFileClip
 
@@ -23,6 +23,14 @@ def test_basic_overlay(scene):
     scene.play(OverlayVideo(video))
 
 
+@pytest.snapshot_frames_comparison(last_frame=False)
+def test_basic_overlay_with_mask(scene):
+    video = VideoMObject(pytest.get_test_clip(num_images=15, fps=15, mask=True)).stretch_to_keep_aspect().scale(1.5)
+    outline = video.get_border().set_stroke(color=BLUE, width=5)
+    scene.add(outline)
+    scene.play(OverlayVideo(video))
+
+
 def test_ordered_vertices():
     video = VideoMObject(pytest.get_test_clip(num_images=1, fps=15))
     vertices = video.get_ordered_vertices()
@@ -32,17 +40,20 @@ def test_ordered_vertices():
 
 
 @pytest.mark.parametrize(
-    "size, shift, rotate, t",
+    "size, shift, rotate, mask, t",
     [
-        ((1, 1), ORIGIN, 0, 0),
-        ((2, 2), UP, 90, 0.5 - 1 / 10),
-        ((3, 4), DOWN, 180, 1 - 1 / 5),
+        ((1, 1), ORIGIN, 0, False, 0),
+        ((2, 2), UP, 90, False, 0.5 - 1 / 10),
+        ((3, 4), DOWN, 180, False, 1 - 1 / 5),
+        ((1, 1), ORIGIN, 0, True, 0),
+        ((2, 2), UP, 90, True, 0.5 - 1 / 10),
+        ((3, 4), DOWN, 180, True, 1 - 1 / 5),
     ],
 )
 @pytest.snapshot_frames_comparison(last_frame=True)
-def test_get_frame(scene, size, shift, rotate, t):
+def test_get_frame(scene, size, shift, rotate, mask, t):
     height, width = size
-    video = VideoMObject(pytest.get_test_clip(num_images=5, fps=5))
+    video = VideoMObject(pytest.get_test_clip(num_images=5, fps=5, mask=mask))
     video = video.stretch_to_fit_height(height).stretch_to_fit_width(width)
     video = video.shift(shift).rotate(rotate * DEGREES)
 
@@ -75,7 +86,7 @@ def test_video_border(size, shift, rotate):
     assert np.allclose(border.points, video.points)
 
 
-@pytest.snapshot_frames_comparison(last_frame=False, quality="high_quality")
+@pytest.snapshot_frames_comparison(last_frame=False)
 def test_overlay_with_different_fps(scene):
     video1 = VideoMObject(pytest.get_test_clip(num_images=10, fps=30))
     video2 = VideoMObject(pytest.get_test_clip(num_images=50, fps=150))
@@ -143,3 +154,18 @@ def test_complex_overlay(scene):
         video.animate.shift(RIGHT + UP).rotate(PI / 4).scale(0.5),
         outline.animate.shift(RIGHT + UP).rotate(PI / 4).scale(0.5),
     )
+
+
+@pytest.snapshot_frames_comparison(last_frame=False)
+def test_always_redraw_sync(scene):
+    time = ValueTracker(0)
+    clip = pytest.get_test_clip(num_images=30, fps=15, mask=True)
+
+    video = always_redraw(
+        lambda: VideoMObject(clip).stretch_to_keep_aspect().scale(1.5).shift(time.get_value() * RIGHT + 2 * LEFT)
+    )
+    outline = video.get_border().set_stroke(color=BLUE, width=5)
+    scene.add(outline)
+    scene.add(video)
+
+    scene.play(OverlayVideo(video), time.animate(run_time=2).set_value(4), outline.animate(run_time=2).shift(4 * RIGHT))
