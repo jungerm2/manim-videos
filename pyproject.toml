@@ -28,10 +28,10 @@ dependencies = [
 slides = ["manim-slides>=5.0"]
 
 [project.urls]
-Homepage = "https://github.com/your-org/manim-videos"
-Documentation = "https://your-org.github.io/manim-videos"
-Repository = "https://github.com/your-org/manim-videos"
-"Bug Tracker" = "https://github.com/your-org/manim-videos/issues"
+Homepage = "https://github.com/jungerm2/manim-videos"
+Documentation = "https://jungerm2.github.io/manim-videos"
+Repository = "https://github.com/jungerm2/manim-videos"
+"Bug Tracker" = "https://github.com/jungerm2/manim-videos/issues"
 
 [dependency-groups]
 dev = [
