@@ -1,17 +1,15 @@
-from manim import VMobject
 import itertools
-import requests
 from pathlib import Path
 
 import numpy as np
+import requests
 from manim import *
 from manim.utils import rate_functions
-from PIL import Image
-from moviepy import DataVideoClip, VideoClip, VideoFileClip, vfx
+from moviepy import DataVideoClip, VideoClip, VideoFileClip
 from moviepy.video.tools.drawing import color_gradient
+from PIL import Image
 
-from manim_videos import VideoMObject, OverlayVideo, VideoMixin
-
+from manim_videos import OverlayVideo, VideoMixin, VideoMObject
 
 LOGO_PATH = "assets/DVD_VIDEO_logo.png"
 GRADIENT_PATH = "assets/gradients-{num_frames}.mp4"
@@ -113,7 +111,9 @@ class DVDBouncing(VideoMixin, Scene):
         self.play(
             OverlayVideo(video),
             Succession(
-                video.animate(run_time=video.duration / 4, rate_func=rate_functions.ease_in_out_sine).shift(shift_to_center),
+                video.animate(run_time=video.duration / 4, rate_func=rate_functions.ease_in_out_sine).shift(
+                    shift_to_center
+                ),
                 FadeOut(video, run_time=3 * video.duration / 4),
             ),
         )
