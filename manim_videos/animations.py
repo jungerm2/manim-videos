@@ -61,6 +61,7 @@ class OverlayVideo(Wait):
         self._ts: list[float] = []
         self._corners: list[np.ndarray] = []
         self._radii: list[float] = []
+        self._opacities: list[float] = []
         super().__init__(run_time, frozen_frame=frozen_frame, **kwargs)
 
     def interpolate(self, alpha: float) -> None:
@@ -68,6 +69,7 @@ class OverlayVideo(Wait):
         self._ts.append(alpha)
         self._corners.append(self.video_mobject.get_ordered_corners())
         self._radii.append(self.video_mobject.corner_radius)
+        self._opacities.append(self.video_mobject.get_stroke_opacity())
 
     @staticmethod
     def coords_to_pix(scene: Scene, point: np.ndarray) -> np.ndarray:
@@ -148,6 +150,7 @@ class OverlayVideo(Wait):
         self._corners = np.array(self._corners)
         self._corners = self.coords_to_pix(scene, self._corners)
         self._radii = np.array(self._radii)
+        self._opacities = np.array(self._opacities)
         self._ts = np.array(self._ts)
 
     def finalize(self) -> None:
@@ -214,7 +217,8 @@ class OverlayVideo(Wait):
 
         @functools.cache
         def get_homography(t):
-            # It seems the animation is exactly off by one frame, so we add 1/fps
+            """Return the homography matrix for a given time t."""
+            # Note: it seems the animation is exactly off by one frame, so we add 1/fps
             # to the time here. I have no idea why this occurs yet...
             t += 1 / config.frame_rate
 
@@ -225,9 +229,12 @@ class OverlayVideo(Wait):
             return np.array([np.interp(t / self.run_time, self._ts, param) for param in homographies.T])
 
         def warp_frame(get_frame, t):
-            # Using PIL to warp frames like this is actually what moviepy does under the hood
-            # (eg: in rotate, scale, etc.) so it's more efficient (and general) to do it once
-            # using a homography than to use moviepy's rotate/scale/etc. methods.
+            """Warp a single frame from the section video to match the shape of the overlay video.
+
+            Using PIL to warp frames like this is actually what moviepy does under the hood
+            (eg: in rotate, scale, etc.) so it's more efficient (and general) to do it once
+            using a homography than to use moviepy's rotate/scale/etc. methods.
+            """
             frame = get_frame(t)
             params = get_homography(t)
 
@@ -253,7 +260,7 @@ class OverlayVideo(Wait):
             )
 
         def get_inverse_homography(params):
-            # Rebuild matrix from params, invert it, normalize it, and return the params
+            """Rebuild matrix from params, invert it, normalize it, and return the params."""
             a, b, c, d, e, f, g, h = params
             H = np.array([a, b, c, d, e, f, g, h, 1])
             H = np.linalg.inv(H.reshape(3, 3))
@@ -261,8 +268,12 @@ class OverlayVideo(Wait):
             return H[:8]
 
         def apply_similarity_transform(clip, params):
-            # If the homography is a pure translation+scale, use it to set the clip's position/resize
-            # We need to invert it first because it's the backward mapping (section -> clip)
+            """Apply a similarity transform to the clip.
+
+            If the homography is a pure translation+scale, use it to set the clip's
+            position/resize. We need to invert it first because it's the backward
+            mapping (section -> clip).
+            """
             a, b, c, d, e, f, g, h = get_inverse_homography(params)
             clip = clip.with_position((c, f)).resized((clip.w * np.abs(a), clip.h * np.abs(e)))
 
@@ -274,13 +285,16 @@ class OverlayVideo(Wait):
             return clip
 
         def is_similarity_transform(params):
-            # Check if the homography is a similarity transform, this works for both the
-            # forward/backward mapping since everything except the translation/scale should be eye(3).
+            """Check if the homography is a similarity transform
+
+            This works for both the forward/backward mapping since everything except the
+            translation/scale should be eye(3).
+            """
             a, b, c, d, e, f, g, h = params
             return np.allclose([b - 1, d - 1, g, h], 0)
 
-        def make_mask(t=None, clip_w=100, clip_h=100):
-            # Convert Manim radius to pixel radius and create a rounded rectangle mask
+        def make_mask(t, *, clip_w, clip_h):
+            """Convert Manim radius to pixel radius and create a rounded rectangle mask."""
             t += 1 / config.frame_rate  # same fix as above
             radius = np.interp(t / self.run_time, self._ts, self._radii)
             radius_px = int(radius * (clip_w / self.video_mobject.width))
@@ -289,23 +303,56 @@ class OverlayVideo(Wait):
             draw.rounded_rectangle((0, 0, clip_w - 1, clip_h - 1), radius=radius_px, fill=255)
             return np.array(mask_image) / 255.0
 
-        if np.any(self._radii > 0):
+        def get_opacity(t):
+            """Interpolate the per-frame opacity recorded during the animation."""
+            t += 1 / config.frame_rate  # same fix as above
+            return float(np.interp(t / self.run_time, self._ts, self._opacities))
+
+        def make_combined_mask(t, *, clip_w, clip_h, needs_opacity, needs_rounded):
+            """Make a combined mask with rounded corners and opacity."""
+            if needs_rounded:
+                mask = make_mask(t, clip_w=clip_w, clip_h=clip_h)
+            else:
+                mask = np.ones((clip_h, clip_w), dtype=np.float64)
+            if needs_opacity:
+                mask = mask * get_opacity(t)
+            return mask
+
+        needs_opacity = not np.allclose(self._opacities, 1.0)
+        needs_rounded = np.any(self._radii > 0)
+
+        if needs_rounded or needs_opacity:
             # Snapshot original clip dimensions before `clip` gets reassigned by
             # with_mask() / transform() later — the closure must use the originals.
             clip_w, clip_h = clip.w, clip.h
 
-            if np.allclose(self._radii, self._radii[0]):
-                mask = make_mask(0, clip_w=clip_w, clip_h=clip_h)
-                rounded_mask = ImageClip(mask, is_mask=True).with_duration(clip.duration)
+            # Build a per-frame mask combining rounded corners and opacity
+            static_rounded = needs_rounded and np.allclose(self._radii, self._radii[0])
+            static_opacity = needs_opacity and np.allclose(self._opacities, self._opacities[0])
+
+            if (static_rounded or not needs_rounded) and (static_opacity or not needs_opacity):
+                # Both effects (if present) are constant -- use a single static mask
+                mask = make_combined_mask(
+                    0, clip_w=clip_w, clip_h=clip_h, needs_opacity=needs_opacity, needs_rounded=needs_rounded
+                )
+                combined_mask = ImageClip(mask, is_mask=True).with_duration(clip.duration)
             else:
-                rounded_mask = VideoClip(
-                    frame_function=partial(make_mask, clip_w=clip_w, clip_h=clip_h), is_mask=True
-                ).with_duration(clip.duration)
+                # At least one effect is animated -- build a dynamic mask
+                combined_mask_fn = partial(
+                    make_combined_mask,
+                    clip_w=clip_w,
+                    clip_h=clip_h,
+                    needs_opacity=needs_opacity,
+                    needs_rounded=needs_rounded,
+                )
+                combined_mask = VideoClip(frame_function=combined_mask_fn, is_mask=True).with_duration(clip.duration)
 
             if clip.mask:
-                clip = clip.mask.transform(lambda get_frame, t: get_frame(t) * rounded_mask.get_frame(t))
+                clip = clip.with_mask(
+                    clip.mask.transform(lambda get_frame, t: get_frame(t) * combined_mask.get_frame(t))
+                )
             else:
-                clip = clip.with_mask(rounded_mask)
+                clip = clip.with_mask(combined_mask)
 
         if len(homographies) == 1 and is_similarity_transform(homographies[0]):
             clip = apply_similarity_transform(clip, homographies[0])

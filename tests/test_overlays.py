@@ -1,6 +1,22 @@
 import numpy as np
 import pytest
-from manim import BLUE, DEGREES, DOWN, LEFT, ORIGIN, PI, RIGHT, UP, FadeIn, Rotate, Text, ValueTracker, always_redraw
+from manim import (
+    BLUE,
+    DEGREES,
+    DOWN,
+    LEFT,
+    ORIGIN,
+    PI,
+    RIGHT,
+    UP,
+    FadeIn,
+    FadeOut,
+    Rotate,
+    Succession,
+    Text,
+    ValueTracker,
+    always_redraw,
+)
 from manim.utils import rate_functions
 from moviepy import VideoFileClip
 
@@ -24,6 +40,17 @@ def test_basic_overlay(scene):
     )
     scene.add(video)
     scene.play(OverlayVideo(video))
+
+
+@pytest.snapshot_frames_comparison(last_frame=False)
+def test_fade_overlay(scene):
+    video = (
+        VideoMObject(pytest.get_test_clip(num_images=15, fps=15), stroke_width=5, stroke_color=BLUE)
+        .stretch_to_keep_aspect()
+        .scale(1.5)
+    )
+    scene.add(video)
+    scene.play(Succession(FadeIn(video, run_time=0.5), FadeOut(video, run_time=0.5)), OverlayVideo(video))
 
 
 @pytest.snapshot_frames_comparison(last_frame=False)
