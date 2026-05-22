@@ -36,7 +36,6 @@ from __future__ import annotations
 import os
 from ast import literal_eval
 
-from manim import config
 from manim.utils.parameter_parsing import flatten_iterable_parameters
 
 from manim_videos.animations import OverlayVideo
@@ -87,10 +86,6 @@ class VideoMixin:
             filter(lambda a: isinstance(a, OverlayVideo), flatten_iterable_parameters(args)),
             key=lambda a: a.video_mobject.z_index,
         )
-
-        for anim in overlays:
-            anim.video_mobject.set_fill(opacity=0.0, color=config.background_color)
-            anim.video_mobject.set_stroke(opacity=0.0, color=config.background_color)
 
         super().play(*args, **kwargs)
 

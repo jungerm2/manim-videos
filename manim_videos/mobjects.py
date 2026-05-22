@@ -18,25 +18,37 @@ Example::
 
 from __future__ import annotations
 
-import os
-from ast import literal_eval
 from functools import partial
 from pathlib import Path
 from typing import Self
 
 import numpy as np
 import numpy.typing as npt
-from manim import GRAY, RED, RIGHT, Group, ImageMobject, ManimColor, Rectangle, Text, angle_of_vector
+from manim import (
+    DL,
+    DR,
+    RIGHT,
+    UL,
+    UR,
+    WHITE,
+    Group,
+    ImageMobject,
+    ManimColor,
+    Rectangle,
+    VMobject,
+    angle_of_vector,
+)
 from moviepy import VideoFileClip
 
 
-class VideoMObject(Rectangle):
+class VideoMObject(VMobject):
     """A Manim mobject that embeds a video clip in a scene.
 
-    Internally, a :class:`VideoMObject` is a coloured :class:`~manim.Rectangle`
-    that shows a text label (the clip filename) as a placeholder during the
-    "Manim pass".  The actual video frames are composited onto the rendered
-    output by :class:`~manim_videos.animations.OverlayVideo`.
+    Internally, a :class:`VideoMObject` is a :class:`~manim.VMobject` container
+    that acts as a visual placeholder for a video clip. It contains a border
+    rectangle and a text label for visualization during the "Manim pass".
+    The actual video frames are composited onto the rendered output by
+    :class:`~manim_videos.animations.OverlayVideo`.
 
     .. note::
         The clip object is held via a closure inside :meth:`get_clip` rather
@@ -47,12 +59,13 @@ class VideoMObject(Rectangle):
     Args:
         clip: Either a :class:`moviepy.VideoFileClip` instance or a path (str
             or :class:`pathlib.Path`) to a video file.
-        *args: Positional arguments forwarded to :class:`~manim.Rectangle`.
-        stroke_width: Width of the placeholder rectangle border. Defaults to
+        width: Width of the video object. Default 4.0.
+        height: Height of the video object. Default 2.0.
+        stroke_width: Width of the video object border. Defaults to
             ``0`` (no border) so the clip replaces it completely.
-        fill_color: Fill colour of the placeholder. Defaults to ``GRAY``.
-        fill_opacity: Opacity of the placeholder fill. Defaults to ``1.0``.
-        **kwargs: Keyword arguments forwarded to :class:`~manim.Rectangle`.
+        stroke_color: Color of the video object border. Defaults to
+            ``WHITE``.
+        **kwargs: Keyword arguments forwarded to :class:`~manim.VMobject`.
 
     Example::
 
@@ -63,12 +76,14 @@ class VideoMObject(Rectangle):
     def __init__(
         self,
         clip: VideoFileClip | str | Path,
-        *args,
+        width: float = 4.0,
+        height: float = 2.0,
         stroke_width: float = 0,
-        fill_color: ManimColor = GRAY,
-        fill_opacity: float | None = None,
+        stroke_color: ManimColor = WHITE,
         **kwargs,
     ) -> None:
+        super().__init__(fill_opacity=0, stroke_width=0, **kwargs)
+
         if isinstance(clip, (str, Path)):
             clip = VideoFileClip(str(clip))
 
@@ -78,21 +93,34 @@ class VideoMObject(Rectangle):
         #   subprocess to FFMPEG which contains attributes like the PID which are randomly generated.
         #   If not careful and these are allowed to be hashed, then two identical clips will have different hashes.
         # On the other hand: Currying the clip like below means that the actual clip contents are not hashed, only
-        #   it's "manin-style" attributes such as size, position, and clip filename since it's added to self via
-        #   self.text below. For instance if you render a VideoMObject of a subclip (0-1) and change it to (1-2)
+        #   it's "manin-style" attributes such as size, position, and clip filename since it's added to self.
+        #   For instance if you render a VideoMObject of a subclip (0-1) and change it to (1-2)
         #   it will think it was already cached! Other attrs might cause similar issues...
         self.get_clip = partial(lambda: clip)
 
-        self.skip_overlay = literal_eval(os.environ.get("SKIP_VIDEO_OVERLAY", "False"))
-        fill_opacity = fill_opacity if not clip.mask or self.skip_overlay else 0.0
-        super().__init__(*args, stroke_width=stroke_width, fill_color=fill_color, fill_opacity=fill_opacity, **kwargs)
+        # Initialize rectangle geometry
+        self.start_new_path(UR)
+        self.add_points_as_corners([UL, DL, DR, UR])
+        self.close_path()
+        self.stretch_to_fit_width(width)
+        self.stretch_to_fit_height(height)
 
-        self.text = Text(
-            f"Video clip of:\n{getattr(clip, 'filename', 'Unknown')}", color=RED, fill_opacity=fill_opacity
+        # Hidden anchor to track the 4 sharp corners through all transformations
+        self._corners_anchor = VMobject(stroke_opacity=0).set_points([self.get_corner(d) for d in [UR, UL, DL, DR]])
+        self.add(self._corners_anchor)
+
+        self.border = Rectangle(
+            width=width,
+            height=height,
+            stroke_width=stroke_width,
+            stroke_color=stroke_color,
+            fill_opacity=0,
+            stroke_opacity=1,
         ).move_to(self.get_center())
-        self.text.scale_to_fit_width(self.width * 0.95)
-        self.is_reversed = False
-        self.add(self.text)
+        self.add(self.border)
+
+        self.filename = getattr(clip, "filename", None)
+        self.corner_radius = 0
 
     @property
     def duration(self) -> float:
@@ -102,26 +130,25 @@ class VideoMObject(Rectangle):
     @property
     def angle(self) -> float:
         """The current rotation angle of the mobject (in radians)."""
-        # Vector from Top-Right vertex (points[0]) to Top-Left vertex (points[1])
-        v = self.points[0] - self.points[1]
+        tr, tl, _bl, _br = self.get_ordered_corners()
+        return angle_of_vector(tr - tl) - angle_of_vector(RIGHT)
 
-        if self.is_reversed:
-            v = -v
+    def get_ordered_corners(self) -> npt.NDArray:
+        """Return the "sharp" corners of the video in counter-clockwise order, even if ``reverse_direction`` was called."""
+        return self._corners_anchor.points
 
-        return angle_of_vector(v) - angle_of_vector(RIGHT)
+    def round_corners(self, radius: float) -> Self:
+        """Round the corners of the placeholder rectangle and its border."""
+        self.corner_radius = radius
+        self.border.round_corners(radius)
+        return self
 
-    def get_ordered_vertices(self) -> npt.NDArray:
-        """Return the vertices of the mobject in counter-clockwise order."""
-        vertices = super().get_vertices()
-
-        if self.is_reversed:
-            vertices = vertices[[0, 3, 2, 1]]
-        return vertices
-
-    def reverse_direction(self) -> Self:
-        """Same as `~manim.Mobject.reverse_direction` but also keeps track of the reversed state."""
-        self.is_reversed = not self.is_reversed
-        return super().reverse_direction()
+    def become(self, mobject, *args, **kwargs) -> Self:
+        """Copy custom attributes that Manim's default ``become`` does not propagate."""
+        result = super().become(mobject, *args, **kwargs)
+        if isinstance(mobject, VideoMObject):
+            self.corner_radius = mobject.corner_radius
+        return result
 
     def stretch_to_keep_aspect(self, keep_dim: int = 0) -> Self:
         """Resize the placeholder to match the clip's native aspect ratio.
@@ -138,7 +165,6 @@ class VideoMObject(Rectangle):
             ValueError: If *keep_dim* is not ``0`` or ``1``.
         """
         h, w = self.get_clip().h, self.get_clip().w
-        self.remove(self.text)
 
         if keep_dim == 0:
             self.stretch_to_fit_height(self.width * h / w)
@@ -147,18 +173,7 @@ class VideoMObject(Rectangle):
         else:
             raise ValueError(f"Argument `keep_dim` can only be 0 (width) or 1 (height), got {keep_dim}.")
 
-        self.text.scale_to_fit_width(self.width * 0.95)
-        self.add(self.text)
         return self
-
-    def get_border(self) -> Rectangle:
-        """Return a :class:`~manim.Rectangle` matching the current size, rotation, and stroke of the video."""
-        return (
-            Rectangle()
-            .match_points(self)
-            .set_stroke(color=self.stroke_color, opacity=self.stroke_opacity, width=self.stroke_width)
-            .set_fill(opacity=0)
-        )
 
     def get_frame(self, t: float, border: bool = False) -> Group | ImageMobject:
         """Return the video frame at time *t*.
@@ -187,7 +202,7 @@ class VideoMObject(Rectangle):
         frame.rotate(self.angle)
 
         if border:
-            return Group(self.get_border(), frame)
+            return Group(self.border.copy(), frame)
 
         return frame
 

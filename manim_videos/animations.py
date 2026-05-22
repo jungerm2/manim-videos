@@ -13,12 +13,13 @@ import functools
 import itertools
 import os
 import warnings
+from functools import partial
 from pathlib import Path
 
 import numpy as np
 from manim import Scene, Wait, config
-from moviepy import CompositeVideoClip, VideoFileClip, vfx
-from PIL import Image
+from moviepy import CompositeVideoClip, ImageClip, VideoClip, VideoFileClip, vfx
+from PIL import Image, ImageDraw
 
 from manim_videos.mobjects import VideoMObject
 
@@ -59,12 +60,14 @@ class OverlayVideo(Wait):
         self.skip_animations: bool = False
         self._ts: list[float] = []
         self._corners: list[np.ndarray] = []
+        self._radii: list[float] = []
         super().__init__(run_time, frozen_frame=frozen_frame, **kwargs)
 
     def interpolate(self, alpha: float) -> None:
         super().interpolate(alpha)
         self._ts.append(alpha)
-        self._corners.append(self.video_mobject.get_ordered_vertices())
+        self._corners.append(self.video_mobject.get_ordered_corners())
+        self._radii.append(self.video_mobject.corner_radius)
 
     @staticmethod
     def coords_to_pix(scene: Scene, point: np.ndarray) -> np.ndarray:
@@ -144,6 +147,7 @@ class OverlayVideo(Wait):
         # Convert Manim coordinates to pixel coordinates
         self._corners = np.array(self._corners)
         self._corners = self.coords_to_pix(scene, self._corners)
+        self._radii = np.array(self._radii)
         self._ts = np.array(self._ts)
 
     def finalize(self) -> None:
@@ -274,6 +278,34 @@ class OverlayVideo(Wait):
             # forward/backward mapping since everything except the translation/scale should be eye(3).
             a, b, c, d, e, f, g, h = params
             return np.allclose([b - 1, d - 1, g, h], 0)
+
+        def make_mask(t=None, clip_w=100, clip_h=100):
+            # Convert Manim radius to pixel radius and create a rounded rectangle mask
+            t += 1 / config.frame_rate  # same fix as above
+            radius = np.interp(t / self.run_time, self._ts, self._radii)
+            radius_px = int(radius * (clip_w / self.video_mobject.width))
+            mask_image = Image.new("L", (clip_w, clip_h), 0)
+            draw = ImageDraw.Draw(mask_image)
+            draw.rounded_rectangle((0, 0, clip_w - 1, clip_h - 1), radius=radius_px, fill=255)
+            return np.array(mask_image) / 255.0
+
+        if np.any(self._radii > 0):
+            # Snapshot original clip dimensions before `clip` gets reassigned by
+            # with_mask() / transform() later — the closure must use the originals.
+            clip_w, clip_h = clip.w, clip.h
+
+            if np.allclose(self._radii, self._radii[0]):
+                mask = make_mask(0, clip_w=clip_w, clip_h=clip_h)
+                rounded_mask = ImageClip(mask, is_mask=True).with_duration(clip.duration)
+            else:
+                rounded_mask = VideoClip(
+                    frame_function=partial(make_mask, clip_w=clip_w, clip_h=clip_h), is_mask=True
+                ).with_duration(clip.duration)
+
+            if clip.mask:
+                clip = clip.mask.transform(lambda get_frame, t: get_frame(t) * rounded_mask.get_frame(t))
+            else:
+                clip = clip.with_mask(rounded_mask)
 
         if len(homographies) == 1 and is_similarity_transform(homographies[0]):
             clip = apply_similarity_transform(clip, homographies[0])

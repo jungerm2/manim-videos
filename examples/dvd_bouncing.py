@@ -1,3 +1,4 @@
+from manim import VMobject
 import itertools
 import requests
 from pathlib import Path
@@ -21,7 +22,7 @@ COLORS = [tuple(bytes.fromhex(hex_color.strip("#"))) for hex_color in COLORS]
 
 class DVDBouncing(VideoMixin, Scene):
     @staticmethod
-    def make_dvd_logo_video(num_frames=120, fps=30):
+    def make_dvd_logo_video(num_frames=150, fps=30):
         if not Path(LOGO_PATH).exists():
             mask_im = Image.open(requests.get(LOGO_URL, stream=True).content)
             mask_im.save(LOGO_PATH)
@@ -40,8 +41,6 @@ class DVDBouncing(VideoMixin, Scene):
                 (mask.w, mask.h), p1=(0, mask.h / 2), p2=(mask.w, mask.h / 2), color_1=c2, color_2=c1, shape="bilinear"
             )
 
-        Image.fromarray(color_ramp).show()
-
         clip = (
             DataVideoClip(
                 np.linspace(0, mask.w * (len(COLORS) - 2), num_frames),
@@ -57,7 +56,7 @@ class DVDBouncing(VideoMixin, Scene):
 
     def construct(self):
         # Get DVD logo video and spin in into action!
-        clip = self.make_dvd_logo_video().with_effects([vfx.Loop(2)])
+        clip = self.make_dvd_logo_video()
         video = VideoMObject(clip).stretch_to_keep_aspect().scale(1.5)
         self.play(OverlayVideo(video), SpinInFromNothing(video, angle=6 * PI, run_time=video.duration / 2))
         self.next_section()
@@ -71,13 +70,13 @@ class DVDBouncing(VideoMixin, Scene):
                     video.stretch_to_fit_width,
                     width * 0.5,
                     rate_func=rate_functions.ease_out_elastic,
-                    run_time=video.duration / 3,
+                    run_time=video.duration / 4,
                 ),
                 ApplyMethod(
                     video.stretch_to_fit_height,
                     height * 0.5,
                     rate_func=rate_functions.ease_out_elastic,
-                    run_time=video.duration / 3,
+                    run_time=video.duration / 4,
                 ),
             ),
         )
@@ -103,7 +102,19 @@ class DVDBouncing(VideoMixin, Scene):
         video.velocity = DR
         video.add_updater(bounce_updater)
 
-        # Play the animation for 5 times the duration of the video (which was already looped twice)
-        for _ in range(4):
+        # Play the animation for 5 times the duration of the video
+        for _ in range(5):
             self.play(OverlayVideo(video))
             self.next_section()
+
+        # Stop bouncing and smoothly return to center
+        video.remove_updater(bounce_updater)
+        shift_to_center = ORIGIN - video.get_center()
+        self.play(
+            OverlayVideo(video),
+            video.animate(rate_func=rate_functions.ease_in_out_sine).shift(shift_to_center),
+        )
+        self.next_section()
+
+        # Fade out
+        self.play(FadeOut(video))

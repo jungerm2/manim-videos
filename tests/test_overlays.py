@@ -17,73 +17,73 @@ def section_duration(section):
 
 @pytest.snapshot_frames_comparison(last_frame=False)
 def test_basic_overlay(scene):
-    video = VideoMObject(pytest.get_test_clip(num_images=15, fps=15)).stretch_to_keep_aspect().scale(1.5)
-    outline = video.get_border().set_stroke(color=BLUE, width=5)
-    scene.add(outline)
+    video = (
+        VideoMObject(pytest.get_test_clip(num_images=15, fps=15), stroke_width=5, stroke_color=BLUE)
+        .stretch_to_keep_aspect()
+        .scale(1.5)
+    )
+    scene.add(video)
     scene.play(OverlayVideo(video))
 
 
 @pytest.snapshot_frames_comparison(last_frame=False)
-def test_basic_overlay_with_mask(scene):
-    video = VideoMObject(pytest.get_test_clip(num_images=15, fps=15, mask=True)).stretch_to_keep_aspect().scale(1.5)
-    outline = video.get_border().set_stroke(color=BLUE, width=5)
-    scene.add(outline)
+def test_overlay_with_mask(scene):
+    video = (
+        VideoMObject(pytest.get_test_clip(num_images=15, fps=15, mask=True), stroke_width=5, stroke_color=BLUE)
+        .stretch_to_keep_aspect()
+        .scale(1.5)
+    )
+    scene.add(video)
     scene.play(OverlayVideo(video))
+
+
+@pytest.snapshot_frames_comparison(last_frame=False)
+def test_rounded_corners(scene):
+    radius = ValueTracker(0)
+    video = always_redraw(
+        lambda: (
+            VideoMObject(pytest.get_test_clip(num_images=15, fps=15), stroke_width=5, stroke_color=BLUE)
+            .stretch_to_keep_aspect()
+            .scale(1.5)
+            .round_corners(radius.get_value())
+        )
+    )
+    scene.add(video)
+    scene.play(OverlayVideo(video), radius.animate.set_value(1.5))
 
 
 def test_ordered_vertices():
     video = VideoMObject(pytest.get_test_clip(num_images=1, fps=15))
-    vertices = video.get_ordered_vertices()
+    vertices = video.get_ordered_corners()
     video.reverse_direction()
-    vertices_rev = video.get_ordered_vertices()
+    vertices_rev = video.get_ordered_corners()
     assert np.allclose(vertices, vertices_rev)
 
 
 @pytest.mark.parametrize(
-    "size, shift, rotate, mask, t",
+    "size, shift, rotate, mask",
     [
-        ((1, 1), ORIGIN, 0, False, 0),
-        ((2, 2), UP, 90, False, 0.5 - 1 / 10),
-        ((3, 4), DOWN, 180, False, 1 - 1 / 5),
-        ((1, 1), ORIGIN, 0, True, 0),
-        ((2, 2), UP, 90, True, 0.5 - 1 / 10),
-        ((3, 4), DOWN, 180, True, 1 - 1 / 5),
+        ((1, 1), ORIGIN, 0, False),
+        ((2, 2), UP, 90, False),
+        ((3, 4), DOWN, 180, False),
+        ((1, 1), ORIGIN, 0, True),
+        ((2, 2), UP, 90, True),
+        ((3, 4), DOWN, 180, True),
     ],
 )
 @pytest.snapshot_frames_comparison(last_frame=True)
-def test_get_frame(scene, size, shift, rotate, mask, t):
+def test_get_frame(scene, size, shift, rotate, mask):
     height, width = size
-    video = VideoMObject(pytest.get_test_clip(num_images=5, fps=5, mask=mask))
+    video = VideoMObject(pytest.get_test_clip(num_images=5, fps=5, mask=mask), stroke_width=5, stroke_color=BLUE)
     video = video.stretch_to_fit_height(height).stretch_to_fit_width(width)
     video = video.shift(shift).rotate(rotate * DEGREES)
 
     if pytest.snapshot_update:
-        scene.add(video.get_frame(t))
+        scene.add(video.get_last_frame(border=True))
         scene.wait()
     else:
+        scene.add(video)
         scene.play(OverlayVideo(video))
-
-
-@pytest.mark.parametrize(
-    "size, shift, rotate",
-    [
-        ((1, 1), ORIGIN, 0),
-        ((2, 2), UP, 90),
-        ((3, 4), DOWN, 180),
-    ],
-)
-def test_video_border(size, shift, rotate):
-    height, width = size
-    video = VideoMObject(pytest.get_test_clip(num_images=15, fps=15))
-    video = video.stretch_to_fit_height(height).stretch_to_fit_width(width)
-    video = video.shift(shift).rotate(rotate * DEGREES)
-    border = video.get_border()
-    assert border.width == video.width
-    assert border.height == video.height
-    assert border.stroke_width == video.stroke_width
-    assert border.stroke_opacity == video.stroke_opacity
-    assert border.stroke_color == video.stroke_color
-    assert np.allclose(border.points, video.points)
 
 
 @pytest.snapshot_frames_comparison(last_frame=False)
@@ -113,12 +113,15 @@ def test_shifted_overlay(scene):
     # Text ensures video alpha channel is properly rendered
     text1 = Text("Animated").rotate(90 * DEGREES).to_edge(LEFT)
     text2 = Text("Overlay").rotate(90 * DEGREES).to_edge(RIGHT)
-    video = VideoMObject(pytest.get_test_clip(num_images=30, fps=15)).stretch_to_keep_aspect().scale(1.5)
-    outline = video.get_border().set_stroke(color=BLUE, width=5)
+    video = (
+        VideoMObject(pytest.get_test_clip(num_images=30, fps=15), stroke_width=5, stroke_color=BLUE)
+        .stretch_to_keep_aspect()
+        .scale(1.5)
+    )
+    scene.add(video)
     scene.play(
         OverlayVideo(video),
         video.animate(rate_func=rate_functions.wiggle, run_time=2).shift(LEFT * 3),
-        outline.animate(rate_func=rate_functions.wiggle, run_time=2).shift(LEFT * 3),
         FadeIn(text1),
         FadeIn(text2),
     )
@@ -129,30 +132,40 @@ def test_rotated_overlay(scene):
     # Note: We do not use `animate.rotate` here because it applies a transformation from the initial state
     # to the final rotated state (interpolation between the two states), without showing proper rotation
     # See: https://docs.manim.community/en/stable/reference/manim.mobject.mobject.Mobject.html#manim.mobject.mobject.Mobject.rotate
-    video = VideoMObject(pytest.get_test_clip(num_images=15, fps=15)).stretch_to_keep_aspect().rotate(PI / 4)
-    outline = video.get_border().set_stroke(color=BLUE, width=5).scale(1.025)
-    scene.play(OverlayVideo(video), Rotate(video, angle=PI / 2), Rotate(outline, angle=PI / 2))
+    video = (
+        VideoMObject(pytest.get_test_clip(num_images=15, fps=15), stroke_width=5, stroke_color=BLUE)
+        .stretch_to_keep_aspect()
+        .rotate(PI / 4)
+    )
+    scene.add(video)
+    scene.play(OverlayVideo(video), Rotate(video, angle=PI / 2))
 
 
 @pytest.snapshot_frames_comparison(last_frame=False)
 def test_scaled_overlay(scene):
-    video = VideoMObject(pytest.get_test_clip(num_images=15, fps=15)).stretch_to_keep_aspect().scale(0.5)
-    outline = video.get_border().set_stroke(color=BLUE, width=5).scale(1.025)
+    video = (
+        VideoMObject(pytest.get_test_clip(num_images=15, fps=15), stroke_width=5, stroke_color=BLUE)
+        .stretch_to_keep_aspect()
+        .scale(0.5)
+    )
+    scene.add(video)
     scene.play(
         OverlayVideo(video),
         video.animate.scale(2),
-        outline.animate.scale(2),
     )
 
 
 @pytest.snapshot_frames_comparison(last_frame=False)
 def test_complex_overlay(scene):
-    video = VideoMObject(pytest.get_test_clip(num_images=15, fps=15)).stretch_to_keep_aspect().scale(2)
-    outline = video.get_border().set_stroke(color=BLUE, width=5)
+    video = (
+        VideoMObject(pytest.get_test_clip(num_images=15, fps=15), stroke_width=5, stroke_color=BLUE)
+        .stretch_to_keep_aspect()
+        .scale(2)
+    )
+    scene.add(video)
     scene.play(
         OverlayVideo(video),
         video.animate.shift(RIGHT + UP).rotate(PI / 4).scale(0.5),
-        outline.animate.shift(RIGHT + UP).rotate(PI / 4).scale(0.5),
     )
 
 
@@ -162,10 +175,12 @@ def test_always_redraw_sync(scene):
     clip = pytest.get_test_clip(num_images=30, fps=15, mask=True)
 
     video = always_redraw(
-        lambda: VideoMObject(clip).stretch_to_keep_aspect().scale(1.5).shift(time.get_value() * RIGHT + 2 * LEFT)
+        lambda: (
+            VideoMObject(clip, stroke_width=5, stroke_color=BLUE)
+            .stretch_to_keep_aspect()
+            .scale(1.5)
+            .shift(time.get_value() * RIGHT + 2 * LEFT)
+        )
     )
-    outline = video.get_border().set_stroke(color=BLUE, width=5)
-    scene.add(outline)
     scene.add(video)
-
-    scene.play(OverlayVideo(video), time.animate(run_time=2).set_value(4), outline.animate(run_time=2).shift(4 * RIGHT))
+    scene.play(OverlayVideo(video), time.animate(run_time=2).set_value(4))
