@@ -107,14 +107,14 @@ class DVDBouncing(VideoMixin, Scene):
             self.play(OverlayVideo(video))
             self.next_section()
 
-        # Stop bouncing and smoothly return to center
+        # Stop bouncing, return to center, and fade out
         video.remove_updater(bounce_updater)
         shift_to_center = ORIGIN - video.get_center()
         self.play(
             OverlayVideo(video),
-            video.animate(rate_func=rate_functions.ease_in_out_sine).shift(shift_to_center),
+            Succession(
+                video.animate(run_time=video.duration / 4, rate_func=rate_functions.ease_in_out_sine).shift(shift_to_center),
+                FadeOut(video, run_time=3 * video.duration / 4),
+            ),
         )
         self.next_section()
-
-        # Fade out
-        self.play(FadeOut(video))
