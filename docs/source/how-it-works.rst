@@ -18,11 +18,46 @@ Core Components
 
 This library provides three main building blocks:
 
-* :class:`~manim_videos.mobjects.VideoMObject`: A :class:`~manim.Rectangle` sub-class that acts as a visual placeholder for a video clip inside your scene. It stores the clip via a closure internally to prevent Manim's caching system from hashing random FFMPEG subprocess attributes.
+* :class:`~manim_videos.mobjects.VideoMObject`: A :class:`~manim.VMobject` sub-class that acts as a visual placeholder for a video clip inside your scene. It stores the clip via a closure internally to prevent Manim's caching system from hashing random FFMPEG subprocess attributes.
 
 * :class:`~manim_videos.animations.OverlayVideo`: A :class:`~manim.Wait`-based animation that "reserves" the correct duration in the Manim output. It also captures the camera state (frame size and center) at render time to ensure the video clip is overlayed with correct alignment. Read more about the caching mechanism in :ref:`limitations`.
 
 * :class:`~manim_videos.mixins.VideoMixin`: A mixin for :class:`~manim.Scene` (and optionally :class:`~manim_slides.Slide`) that hooks into the low-level render loop. It detects when an :class:`~manim_videos.animations.OverlayVideo` is performed and triggers the final MoviePy compositing step for that section of the video.
+
+Per-Frame Effects
+-----------------
+
+:class:`~manim_videos.animations.OverlayVideo` samples the state of the
+:class:`~manim_videos.mobjects.VideoMObject` once per interpolation step
+(i.e. per rendered frame). This allows several compositing effects
+to be driven by ordinary Manim animations:
+
+**Movement and Transformations**
+    At each frame, the four corner positions of the :class:`~manim_videos.mobjects.VideoMObject`
+    are captured in pixel coordinates. A perspective or affine transform matrix
+    is dynamically computed from these points to warp and position the video clip
+    frame-by-frame. This allows standard Manim animations that shift, scale, or
+    rotate the placeholder object to apply automatically and seamlessly to the
+    composited video.
+
+**Rounded corners**
+    :attr:`~manim_videos.mobjects.VideoMObject.corner_radius` is read each
+    frame and converted to a pixel-space rounded-rectangle alpha mask during
+    the compositing pass. The mask can be a single static
+    :class:`~moviepy.ImageClip` (when the radius is constant) or a dynamic
+    :class:`~moviepy.VideoClip` (when it is animated). The radius is set via
+    :meth:`~manim_videos.mobjects.VideoMObject.round_corners`.
+
+**Opacity / fades**
+    The mobject's ``stroke_opacity`` is sampled each frame and used as a
+    uniform scalar multiplier on the clip's alpha channel. Because Manim's
+    :class:`~manim.FadeIn` and :class:`~manim.FadeOut` animate
+    ``stroke_opacity`` on the target mobject, placing them alongside
+    ``OverlayVideo`` in the same ``play()`` call causes the composited clip
+    to fade in or out in sync. When the opacity is constant at ``1.0``
+    throughout the animation, no mask operation is applied, so there is no
+    performance overhead.
+
 
 Quick Previews
 --------------

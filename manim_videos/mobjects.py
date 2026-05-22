@@ -50,6 +50,21 @@ class VideoMObject(VMobject):
     The actual video frames are composited onto the rendered output by
     :class:`~manim_videos.animations.OverlayVideo`.
 
+    Compositing effects are driven by the state of this mobject during the
+    :class:`~manim_videos.animations.OverlayVideo` animation:
+
+    * **Rounded corners** — call :meth:`round_corners` (or animate
+      :attr:`corner_radius` via ``always_redraw``) before/during the play
+      call. The radius is sampled each frame and converted to a pixel-space
+      alpha mask during compositing.
+    * **Opacity / fade** — pair :class:`~manim_videos.animations.OverlayVideo`
+      with :class:`~manim.FadeIn` or :class:`~manim.FadeOut`. The mobject's
+      ``stroke_opacity`` is sampled each frame and applied as a uniform
+      alpha multiplier on the composited clip::
+
+          self.play(OverlayVideo(vid), FadeIn(vid))
+          self.play(OverlayVideo(vid), FadeOut(vid))
+
     .. note::
         The clip object is held via a closure inside :meth:`get_clip` rather
         than as a plain instance attribute. This prevents Manim's caching
@@ -138,7 +153,32 @@ class VideoMObject(VMobject):
         return self._corners_anchor.points
 
     def round_corners(self, radius: float) -> Self:
-        """Round the corners of the placeholder rectangle and its border."""
+        """Round the corners of the composited video clip and its border.
+
+        Sets :attr:`corner_radius` to *radius* and applies
+        ``round_corners(radius)`` to the border rectangle so that the visual
+        placeholder matches the composited result.
+
+        During compositing, :class:`~manim_videos.animations.OverlayVideo`
+        samples :attr:`corner_radius` each frame and converts it to a
+        pixel-space rounded-rectangle alpha mask that is applied to the clip.
+        This means the radius can be animated — for example using
+        ``always_redraw`` with a :class:`~manim.ValueTracker`::
+
+            radius = ValueTracker(0)
+            video = always_redraw(
+                lambda: VideoMObject(clip)
+                    .stretch_to_keep_aspect()
+                    .round_corners(radius.get_value())
+            )
+            self.play(OverlayVideo(video), radius.animate.set_value(0.5))
+
+        Args:
+            radius: Corner radius in Manim scene units.
+
+        Returns:
+            ``self``, for method chaining.
+        """
         self.corner_radius = radius
         self.border.round_corners(radius)
         return self

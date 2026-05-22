@@ -5,6 +5,16 @@ a post-render hook (:meth:`clean_up_from_scene`) to retrieve the path of the
 partial movie file that Manim just wrote.  After the scene's ``play()`` call
 returns, :meth:`finalize` composites the video clip onto that file using
 *moviepy*, replacing it in-place.
+
+Supported compositing effects (all resolved per-frame during compositing):
+
+* **Rounded corners** — set via :meth:`~manim_videos.mobjects.VideoMObject.round_corners`
+  and animated by any Manim animation that changes
+  :attr:`~manim_videos.mobjects.VideoMObject.corner_radius`.
+* **Opacity / fade** — driven by Manim's :class:`~manim.FadeIn` and
+  :class:`~manim.FadeOut` animations (or any animation that alters the
+  mobject's stroke opacity). The opacity is sampled once per interpolation
+  step and applied as a uniform alpha multiplier to the composited mask.
 """
 
 from __future__ import annotations
@@ -33,11 +43,29 @@ class OverlayVideo(Wait):
     clip onto the produced partial movie file (via *moviepy*) in a
     post-processing step.
 
+    Per-frame compositing effects are automatically derived from the state of
+    the :class:`~manim_videos.mobjects.VideoMObject` at each animation step:
+
+    * **Rounded corners**: the :attr:`~manim_videos.mobjects.VideoMObject.corner_radius`
+      is sampled each frame and used to build a rounded-rectangle alpha mask.
+      The radius can be static or animated (e.g. via
+      :meth:`~manim_videos.mobjects.VideoMObject.round_corners` inside an
+      ``always_redraw`` updater).
+    * **Opacity / fades**: the mobject's ``stroke_opacity`` is sampled each frame
+      and applied as a uniform alpha multiplier on top of the clip's existing mask.
+      This means pairing ``OverlayVideo`` with :class:`~manim.FadeIn` or
+      :class:`~manim.FadeOut` works transparently::
+
+          self.play(OverlayVideo(vid), FadeIn(vid))
+          self.play(OverlayVideo(vid), FadeOut(vid))
+
     Args:
         video_mobject: The :class:`~manim_videos.mobjects.VideoMObject` whose
             clip should be composited.
-        *args: Positional arguments forwarded to :class:`~manim.Wait`.
-        **kwargs: Keyword arguments forwarded to :class:`~manim.Wait`.
+        run_time: Override the animation duration. Defaults to the clip's
+            duration (:attr:`~manim_videos.mobjects.VideoMObject.duration`).
+        frozen_frame: Forwarded to :class:`~manim.Wait`.
+        **kwargs: Additional keyword arguments forwarded to :class:`~manim.Wait`.
 
     Note:
         The ``run_time`` of this animation is automatically set to the clip's
@@ -65,6 +93,18 @@ class OverlayVideo(Wait):
         super().__init__(run_time, frozen_frame=frozen_frame, **kwargs)
 
     def interpolate(self, alpha: float) -> None:
+        """Sample per-frame state from the video mobject for later compositing.
+
+        Called by Manim once per rendered frame.  In addition to the standard
+        ``Wait`` interpolation, this method records:
+
+        * The four corner positions of the :class:`~manim_videos.mobjects.VideoMObject`
+          (for homography / warp computation).
+        * The current :attr:`~manim_videos.mobjects.VideoMObject.corner_radius`
+          (for rounded-corner mask generation).
+        * The current ``stroke_opacity`` of the mobject (to support
+          :class:`~manim.FadeIn` / :class:`~manim.FadeOut` applied to the video).
+        """
         super().interpolate(alpha)
         self._ts.append(alpha)
         self._corners.append(self.video_mobject.get_ordered_corners())
@@ -160,9 +200,26 @@ class OverlayVideo(Wait):
         multiple candidates exist), composites the clip with *moviepy*, and
         replaces the original file in-place.
 
-        If the videomobject's animated, each frame of the clip will be warped
-        using an affine or perspective mapping to match the animation. These
-        are computed from the 4 corners of the videomobject at each frame.
+        If the :class:`~manim_videos.mobjects.VideoMObject` is animated, each
+        frame of the clip will be warped using an affine or perspective mapping
+        to match the animation. These are computed from the four corner
+        positions sampled during :meth:`interpolate`.
+
+        Additional per-frame effects that are applied (when active):
+
+        * **Rounded corners**: A rounded-rectangle alpha mask is built from the
+          per-frame :attr:`~manim_videos.mobjects.VideoMObject.corner_radius`
+          values. A static :class:`~moviepy.ImageClip` is used when the radius
+          is constant; a :class:`~moviepy.VideoClip` is used when it is
+          animated.
+        * **Opacity / fade**: The per-frame ``stroke_opacity`` values recorded
+          in :meth:`interpolate` are interpolated and applied as a scalar
+          multiplier on the clip's alpha channel. This makes
+          :class:`~manim.FadeIn` / :class:`~manim.FadeOut` work out of the box.
+
+        When both effects are constant across all frames, a single static
+        :class:`~moviepy.ImageClip` mask is computed rather than a per-frame
+        function, which is more efficient.
 
         Raises:
             RuntimeError: If no suitable partial movie file is found after
