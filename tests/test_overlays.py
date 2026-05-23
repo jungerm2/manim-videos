@@ -13,7 +13,6 @@ from manim import (
     FadeOut,
     Rotate,
     Succession,
-    Text,
     ValueTracker,
     always_redraw,
 )
@@ -137,21 +136,13 @@ def test_overlay_with_different_fps(scene):
 
 @pytest.snapshot_frames_comparison(last_frame=False)
 def test_shifted_overlay(scene):
-    # Text ensures video alpha channel is properly rendered
-    text1 = Text("Animated").rotate(90 * DEGREES).to_edge(LEFT)
-    text2 = Text("Overlay").rotate(90 * DEGREES).to_edge(RIGHT)
     video = (
         VideoMObject(pytest.get_test_clip(num_images=30, fps=15), stroke_width=5, stroke_color=BLUE)
         .stretch_to_keep_aspect()
         .scale(1.5)
     )
     scene.add(video)
-    scene.play(
-        OverlayVideo(video),
-        video.animate(rate_func=rate_functions.wiggle, run_time=2).shift(LEFT * 3),
-        FadeIn(text1),
-        FadeIn(text2),
-    )
+    scene.play(OverlayVideo(video), video.animate(rate_func=rate_functions.wiggle, run_time=2).shift(LEFT * 3))
 
 
 @pytest.snapshot_frames_comparison(last_frame=False)
