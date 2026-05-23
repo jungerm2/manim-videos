@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install system deps (Manim + Manim Slides)
         run: |
@@ -71,7 +71,7 @@ jobs:
             psnfss
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v8
 
       - name: Cache documentation assets
         id: cache-assets
