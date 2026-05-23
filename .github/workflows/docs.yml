@@ -95,7 +95,7 @@ jobs:
 
       - name: Build HTML docs
         run: |
-          uv run --group docs sphinx-build -b html -c docs/ docs/source/ docs/build/html/latest
+          uv run --group docs sphinx-build -vvv -b html -c docs/ docs/source/ docs/build/html/latest
           
           # Move the generated scenes and slides into the latest directory
           mv docs/build/html/latest/source/* docs/build/html/latest
