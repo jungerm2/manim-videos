@@ -15,4 +15,4 @@ from manim_videos.mixins import VideoMixin
 from manim_videos.mobjects import VideoMObject
 
 __all__ = ["OverlayVideo", "VideoMObject", "VideoMixin"]
-__version__ = "0.1.0"
+__version__ = "0.2.0"

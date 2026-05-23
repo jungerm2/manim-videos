@@ -1,8 +1,8 @@
 Changelog
 =========
 
-Unreleased
-----------
+v0.2.0 (2026-05-23)
+-------------------
 
 Features:
     * :class:`~manim_videos.VideoMObject.get_frame` now respects video masks.
